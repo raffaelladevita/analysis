@@ -27,7 +27,7 @@ public class ElasticAnalysis extends AnalysisMonitor {
     private int nEvent, nGen, nElec, nPr;
 //    private double ebeam = 10.6;
 //    private double xsec  = 0.031301651 ;
-    private double ebeam = 10.6;
+    private double ebeam = 6.4;
     private double xsec  = 0.17659394;
 //    private double ebeam = 4.3;
 //    private double xsec  = 0.69260705 ;
@@ -190,12 +190,18 @@ public class ElasticAnalysis extends AnalysisMonitor {
         H2F hi_betavsp_pr = new H2F("hi_betavsp_pr", "hi_betavsp_pr", 100, 0., 6., 100, 0., 1.2);   
         hi_betavsp_pr.setTitleX("p (GeV)");
         hi_betavsp_pr.setTitleY("beta");
+        H1F hi_dphi = new H1F("hi_dphi", "hi_dphi", 100, -360., 360.);   
+        hi_dphi.setTitleX("dphi");
+        hi_dphi.setTitleY("Counts");
+        hi_dphi.setOptStat("1110");
         DataGroup dg_proton = new DataGroup(2,2);
         dg_proton.addDataSet(hi_E_pr, 0);
         dg_proton.addDataSet(hi_Evsp_pr, 1);
         dg_proton.addDataSet(hi_T_pr, 2);
         dg_proton.addDataSet(hi_betavsp_pr, 3);
+        dg_proton.addDataSet(hi_dphi, 4);
         this.getDataGroup().add(dg_proton, 7);
+
        
 
     }
@@ -270,7 +276,7 @@ public class ElasticAnalysis extends AnalysisMonitor {
         this.getAnalysisCanvas().getCanvas("Protons").cd(0);
 //        this.getAnalysisCanvas().getCanvas("Electrons").draw(this.getDataGroup().getItem(1).getH1F("hi_dE_EC"));
         this.getAnalysisCanvas().getCanvas("Protons").getPad(0).getAxisZ().setLog(true);
-        this.getAnalysisCanvas().getCanvas("Protons").draw(this.getDataGroup().getItem(7).getH1F("hi_E_pr"));
+        this.getAnalysisCanvas().getCanvas("Protons").draw(this.getDataGroup().getItem(7).getH1F("hi_dphi"));
         this.getAnalysisCanvas().getCanvas("Protons").cd(1);
         this.getAnalysisCanvas().getCanvas("Protons").draw(this.getDataGroup().getItem(7).getH2F("hi_Evsp_pr"));
         this.getAnalysisCanvas().getCanvas("Protons").cd(2);
@@ -292,6 +298,7 @@ public class ElasticAnalysis extends AnalysisMonitor {
         DataBank recCaloEB = null;
         DataBank recScinEB = null;
         DataBank recBankTB = null;
+        DataBank recBankCVT = null;
         DataBank recBankFT = null;
         DataBank genBankMC = null;
         Particle genEl = null;
@@ -303,15 +310,21 @@ public class ElasticAnalysis extends AnalysisMonitor {
         Particle recFT = null;
         LorentzVector virtualPhoton = null;
         LorentzVector hadronSystem  = null;
+        int ntracks = 0;
+        int ncentral = 0;
         if(event.hasBank("REC::Particle")) recBankEB = event.getBank("REC::Particle");
         if(event.hasBank("REC::Calorimeter"))  recCaloEB = event.getBank("REC::Calorimeter");
         if(event.hasBank("REC::Scintillator")) recScinEB = event.getBank("REC::Scintillator");
         if(event.hasBank("TimeBasedTrkg::TBTracks")) recBankTB = event.getBank("TimeBasedTrkg::TBTracks");
+        if(event.hasBank("CVTRec::Tracks")) recBankCVT = event.getBank("CVTRec::Tracks");
         if(event.hasBank("FT::particles")) recBankFT = event.getBank("FT::particles");
         if(event.hasBank("MC::Particle"))  genBankMC = event.getBank("MC::Particle");
-        int ntracks = recBankTB.rows();
+        if(recBankTB!=null)  ntracks  = recBankTB.rows();
+        if(recBankCVT!=null) ncentral = recBankCVT.rows();
+        int nmc = 0;
         if(genBankMC!=null) {
             int nrows = genBankMC.rows();
+            nmc = nrows;
             for(int loop = 0; loop < nrows; loop++) {   
                 Particle genPart = new Particle(
                                               genBankMC.getInt("pid", loop),
@@ -335,13 +348,13 @@ public class ElasticAnalysis extends AnalysisMonitor {
 //            this.getDataGroup().getItem(1).getH1F("hi_gen_rate").fill(hadronSystemGen.mass(),1/trun);
             nGen++;
         }
-        if(recBankEB!=null && recCaloEB!=null && ntracks==1) {
+        if(recBankEB!=null && recCaloEB!=null /*&& ntracks==1 && ncentral==1 && nmc<=2*/) {
             int nrows = recBankEB.rows();
             for(int loop = 0; loop < nrows; loop++){
                 int pidCode = 0;
                 if(recBankEB.getInt("pid", loop)!=0) pidCode = recBankEB.getInt("pid", loop);
-                else if(recBankEB.getByte("charge", loop)==-1) pidCode = -211;
-                else if(recBankEB.getByte("charge", loop)==1)  pidCode =  211;
+                else if(recBankEB.getByte("charge", loop)==-1) pidCode =  11;
+                else if(recBankEB.getByte("charge", loop)==1)  pidCode =  2212;
                 else pidCode = 22;
                 Particle recParticle = new Particle(
                                             pidCode,
@@ -358,7 +371,7 @@ public class ElasticAnalysis extends AnalysisMonitor {
                 double time=0;
                 double path=0;
                 for(int j=0; j<recCaloEB.rows(); j++) {
-                    if(recCaloEB.getShort("pindex",j)==loop && recCaloEB.getByte("detector",j)==DetectorType.ECAL.getDetectorId()) {
+                    if(recCaloEB.getShort("pindex",j)==loop && recCaloEB.getByte("detector",j)==16/*DetectorType.ECAL.getDetectorId()*/) {
                         if(energy1 >= 0 && recCaloEB.getByte("layer",j) == 1) energy1 += recCaloEB.getFloat("energy",j);
                         if(energy4 >= 0 && recCaloEB.getByte("layer",j) == 4) energy4 += recCaloEB.getFloat("energy",j);
                         if(energy7 >= 0 && recCaloEB.getByte("layer",j) == 7) energy7 += recCaloEB.getFloat("energy",j);
@@ -379,7 +392,7 @@ public class ElasticAnalysis extends AnalysisMonitor {
                 recParticle.setProperty("sector",sector);            
 //                if(recBankTB!=null) recParticle.setProperty("sector",recBankTB.getByte("sector", loop)*1.0);
                 if(recParticle.charge()==-1) {
-                    if(recParticle.pid()==11 && recParticle.getProperty("sector")==5) recEl = recParticle;
+                    if(recParticle.pid()==11 && recParticle.getProperty("sector")>0) recEl = recParticle;
                     recNeg = recParticle;
                     recNeg.changePid(11);
 //                    if(this.momentumCheck(recParticle, genEl, 0.1))      recEl = recParticle;
@@ -441,13 +454,16 @@ public class ElasticAnalysis extends AnalysisMonitor {
         if(recEl != null) this.getDataGroup().getItem(2).getH2F("hi_rec_el").fill(recEl.p(),Math.toDegrees(recEl.theta()));
         if(recPr != null) this.getDataGroup().getItem(2).getH2F("hi_rec_pr").fill(recPr.p(),Math.toDegrees(recPr.theta()));
         if(recEl != null) {
+            System.out.println("Analyzed ");
             virtualPhoton = new LorentzVector(0., 0., ebeam, ebeam);
             virtualPhoton.sub(recEl.vector());
             hadronSystem = new LorentzVector(0., 0., ebeam, 0.9383+ebeam);
             hadronSystem.sub(recEl.vector());
-            this.getDataGroup().getItem(2).getH2F("hi_rec_q2w").fill(hadronSystem.mass(),-virtualPhoton.mass2());
-            this.getDataGroup().getItem(2).getH1F("hi_rec_w").fill(hadronSystem.mass());
-//            this.getDataGroup().getItem(2).getH1F("hi_rec_rate").fill(hadronSystem.mass(),1/trun);
+            if(Math.toDegrees(recEl.theta())>0){
+                this.getDataGroup().getItem(2).getH2F("hi_rec_q2w").fill(hadronSystem.mass(),-virtualPhoton.mass2());
+                this.getDataGroup().getItem(2).getH1F("hi_rec_w").fill(hadronSystem.mass());
+            }
+            if(recPr != null && hadronSystem.mass()<1.1) this.getDataGroup().getItem(7).getH1F("hi_dphi").fill(Math.toDegrees(recPr.phi()-recEl.phi()));//            this.getDataGroup().getItem(2).getH1F("hi_rec_rate").fill(hadronSystem.mass(),1/trun);
             if(genEl != null && hadronSystem.mass()<1.1) {
                 nElec++;
                 this.getDataGroup().getItem(3).getH1F("hi_res_el").fill((recEl.p()-genEl.p())*100/genEl.p());
@@ -481,8 +497,8 @@ public class ElasticAnalysis extends AnalysisMonitor {
         for(int i=0; i<hcounts.getData().length; i++) {
             hrate.setBinContent(i, hcounts.getBinContent(i)/(trun*nEvent));
         }
-//        System.out.println("Analyzed " + nEvent + " events and found " + nGen + " MC events, " + nElec + " electrons in the elastic peak, " 
-//                + nPr + " protons " + 1/(trun) + " rate generated (Hz)" + nPr/(trun*nEvent) + " rate reconstructed (Hz)");
+        System.out.println("Analyzed " + nEvent + " events and found " + nGen + " MC events, " + nElec + " electrons in the elastic peak, " 
+                + nPr + " protons " + 1/(trun) + " rate generated (Hz)" + nPr/(trun*nEvent) + " rate reconstructed (Hz)");
     }
 
     @Override
